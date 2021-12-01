@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:book-my-hotel-system-api="http://www.mulesoft.org/schema/mule/book-my-hotel-system-api" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/book-my-hotel-system-api http://www.mulesoft.org/schema/mule/book-my-hotel-system-api/current/mule-book-my-hotel-system-api.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="8b52ff19-c21d-4a6b-aeb9-3feedf778ec5" >
+		<http:request-connection host="sys-bookmyhotel-api.us-e2.cloudhub.io" />
+	</http:request-config>
+	<flow name="getHotelFlow" doc:id="133b9a90-aab9-463a-9f4d-3579c9a1c071" >
+		<ee:cache doc:name="Cache" doc:id="df8751a4-ee7b-47d1-89c5-b14a8129c1c1" >
+			<http:request method="GET" doc:name="Request" doc:id="a1eff5bb-1633-4cba-8852-ae4ce49145a5" config-ref="HTTP_Request_configuration" path="/api/hotels">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	city : attributes.queryParams.city
+}]]]></http:query-params>
+		</http:request>
+		</ee:cache>
+		<ee:transform doc:name="Transform Message" doc:id="b57d59db-7a39-4d8a-a253-1cefc2304cca" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="bookHotelFlow" doc:id="76a092a5-9710-4547-bd2d-f7997fc43a8f" >
+		<ee:transform doc:name="Transform Message" doc:id="d515e8a3-407a-432c-99fe-e22f1e17943b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"Hotel Booked"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="cancelFlightFlow" doc:id="d4fc0445-f1a5-4c1b-a14c-9c811c16b58e" >
+		<ee:transform doc:name="Transform Message" doc:id="794a7bf7-e0a6-44c2-ad07-cbb57af6df4d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"Hotel Cancelleled"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
