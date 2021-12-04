@@ -8,11 +8,15 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
 	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="8b52ff19-c21d-4a6b-aeb9-3feedf778ec5" >
-		<http:request-connection host="sys-bookmyhotel-api.us-e2.cloudhub.io" />
+		<http:request-connection host="${request.host}" />
 	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="99253a2d-ec8e-4fcf-b264-809717f61dd9" file="config.yaml" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="8911c9f7-8457-4f7c-b41b-670e018d0fb7" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${db.username}" password="${db.password}" database="${db.databasename}" />
+	</db:config>
 	<flow name="getHotelFlow" doc:id="133b9a90-aab9-463a-9f4d-3579c9a1c071" >
 		<ee:cache doc:name="Cache" doc:id="df8751a4-ee7b-47d1-89c5-b14a8129c1c1" >
-			<http:request method="GET" doc:name="Request" doc:id="a1eff5bb-1633-4cba-8852-ae4ce49145a5" config-ref="HTTP_Request_configuration" path="/api/hotels">
+			<http:request method="GET" doc:name="Request" doc:id="a1eff5bb-1633-4cba-8852-ae4ce49145a5" config-ref="HTTP_Request_configuration" path="${request.path}">
 			<http:query-params><![CDATA[#[output application/java
 ---
 {
@@ -30,22 +34,80 @@ payload]]></ee:set-payload>
 		</ee:transform>
 	</flow>
 	<flow name="bookHotelFlow" doc:id="76a092a5-9710-4547-bd2d-f7997fc43a8f" >
-		<ee:transform doc:name="Transform Message" doc:id="d515e8a3-407a-432c-99fe-e22f1e17943b" >
+		<set-variable value="#[attributes.queryParams.ID]" doc:name="Set Variable" doc:id="fe1b00f9-f745-411f-833e-bd676ce54ff4" variableName="hotelId"/>
+		<db:select doc:name="Select" doc:id="be231d04-1c6f-4aac-a9a8-b5efec3e1ea2" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT Available from
+bookmyholiday.Hotels
+where hotelId = :hotelID]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	hotelID : vars.hotelId
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="ff212291-6414-4d4d-ad51-10bfff5ee3bf" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
 ---
-"Hotel Booked"]]></ee:set-payload>
+payload[0]]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-	</flow>
-	<flow name="cancelFlightFlow" doc:id="d4fc0445-f1a5-4c1b-a14c-9c811c16b58e" >
-		<ee:transform doc:name="Transform Message" doc:id="794a7bf7-e0a6-44c2-ad07-cbb57af6df4d" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
+		<set-variable value="#[payload.Available]" doc:name="Set Variable" doc:id="8307f880-b095-404f-9626-ce46c5a05f12" variableName="Available"/>
+		<choice doc:name="Choice" doc:id="80e09c20-b37e-4ac3-b529-0ebef704eda8" >
+			<when expression="#[vars.Available &gt; 0]">
+				<ee:cache doc:name="Cache" doc:id="a9ac6560-183e-4171-92c3-e2893b481d1a">
+			<db:update doc:name="Book Hotel" doc:id="7384fa98-5c24-4b28-bd45-a124c07cbf19" config-ref="Database_Config">
+			<db:sql><![CDATA[update bookmyholiday.Hotels 
+SET
+Available = Available - 1
+WHERE hotelId = hotelId]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	hotelId : vars.hotelId
+}]]]></db:input-parameters>
+		</db:update>
+		</ee:cache>
+				<ee:transform doc:name="Transform Message" doc:id="d515e8a3-407a-432c-99fe-e22f1e17943b">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
-"Hotel Cancelleled"]]></ee:set-payload>
+{
+"Dear Customer Hotel Booked with ID" : vars.hotelId,
+ "Happy" : "Journey"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="1f930afd-79c0-4fb0-add1-bc705cb1cc17" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"Hotel Not Available"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="cancelFlightFlow" doc:id="d4fc0445-f1a5-4c1b-a14c-9c811c16b58e" >
+		<set-variable value="#[attributes.queryParams.ID]" doc:name="ID" doc:id="8a7eb1fa-9b20-4def-b815-12965ca5535a" variableName="hotelId" />
+		<ee:cache doc:name="Cache" doc:id="82f26927-8267-4390-98db-fdb47b2903a6" >
+			<db:update doc:name="Cancel Hotel" doc:id="a02912a7-519f-4bf4-95b5-13e91129d464" config-ref="Database_Config" >
+				<db:sql ><![CDATA[update bookmyholiday.Hotels 
+SET
+Available = Available + 1
+WHERE hotelId = hotelId]]></db:sql>
+				<db:input-parameters ><![CDATA[#[{
+	hotelId : vars.hotelId
+}]]]></db:input-parameters>
+			</db:update>
+		</ee:cache>
+		<ee:transform doc:name="Transform Message" doc:id="794a7bf7-e0a6-44c2-ad07-cbb57af6df4d">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+"Dear User Hotel Cancelled for hotel = " : vars.hotelId]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 	</flow>
